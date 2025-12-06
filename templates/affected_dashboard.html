@@ -1,0 +1,190 @@
+{% extends "base.html" %}
+
+{% block title %} — Affected Dashboard{% endblock %}
+
+{% block content %}
+<div class="min-h-screen bg-base-200/20 py-10 relative">
+    <!-- Fixed background logo -->
+    <img src="/static/img/shareLine-logo.png" alt="ShareLine Logo Background"
+        class="fixed inset-0 w-full h-full object-contain opacity-10 pointer-events-none z-0" />
+
+    <!-- Content wrapper -->
+    <div class="relative z-10 flex justify-center items-start px-4">
+
+    <!-- Image-full card with faint logo -->
+    <div class="card w-full max-w-5xl bg-base-100/95 backdrop-blur-sm shadow-xl rounded-2xl">
+
+        <!-- Card body -->
+        <div class="card-body space-y-6 p-8">
+
+            <!-- Header / intro -->
+            <div class="flex justify-between items-start gap-4">
+                <div>
+                    <h2 class="card-title text-3xl font-bold mb-2">
+                        Welcome, {{ current_user.name }}!
+                    </h2>
+                    <p class="text-sm leading-relaxed text-base-content/70">
+                        This is your ShareLine space to find items you need.
+                        Browse available donations from other students and request
+                        the essentials that could support you the most.
+                    </p>
+                </div>
+                <a href="/affected/requests" class="btn btn-error btn-outline gap-2">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                    </svg>
+                    My Requests
+                </a>
+            </div>
+
+            <div class="divider"></div>
+
+            <!-- Available items section -->
+            <div id="available-items-section"
+                 x-data="itemsLoader('/items/?status=Available')"
+                 @items-updated.window="loadItems()">
+                <h3 class="text-lg font-semibold mb-2">
+                    Available Items
+                </h3>
+                <p class="text-xs mb-3 text-base-content/70">
+                    These items have been shared by donors and are currently available to request.
+                </p>
+
+                <!-- Alpine.js refresh button -->
+                <button class="btn btn-sm btn-outline mb-3"
+                        @click="loadItems()"
+                        :disabled="loading">
+                    <span x-show="!loading">Refresh Items</span>
+                    <span x-show="loading">Loading...</span>
+                </button>
+
+                <div x-show="error" class="alert alert-error mb-4 rounded-xl">
+                    <span x-text="error"></span>
+                </div>
+
+                <div x-show="loading && items.length === 0" class="text-center py-4">
+                    <span class="loading loading-spinner loading-lg"></span>
+                    <p class="text-base-content/70">Loading items…</p>
+                </div>
+
+                <div x-show="!loading && items.length === 0 && !error" class="text-center py-4">
+                    <p class="text-base-content/70">No items available yet. Check back later!</p>
+                </div>
+
+                <ul class="space-y-6" x-show="!loading && items.length > 0">
+                    <template x-for="item in items" :key="item.id">
+                        <li class="card bg-base-200 shadow-sm rounded-xl">
+                            <div class="card-body">
+                                <h3 class="card-title" x-text="item.name"></h3>
+                                <p class="text-sm">
+                                    <strong>Category:</strong> <span x-text="item.category"></span> ·
+                                    <strong>Quantity:</strong> <span x-text="item.quantity"></span> ·
+                                    <strong>Status:</strong> <span x-text="item.status"></span>
+                                </p>
+                                <p class="text-sm">
+                                    <strong>Location:</strong> <span x-text="item.location"></span>
+                                </p>
+                                <p class="text-sm" x-text="item.description"></p>
+                                <div class="card-actions justify-end mt-2">
+                                    <button
+                                        class="btn btn-sm btn-error "
+                                        @click="$store.requestItem.open(item)"
+                                        x-show="item.quantity > 0">
+                                        Request Item
+                                    </button>
+                                </div>
+                            </div>
+                        </li>
+                    </template>
+                </ul>
+            </div>
+
+        </div> <!-- card-body -->
+
+        <!-- Request Item pop-up card (modal), styled like login/register/donor donate -->
+        <div
+            x-data="$store.requestItem"
+            class="fixed inset-0 bg-black/60 flex items-center justify-center p-4 z-20"
+            x-show="showModal"
+            x-transition.opacity
+        >
+            <div
+                class="card bg-base-100 w-full max-w-sm shadow-2xl rounded-2xl"
+                @click.outside="close()"
+            >
+                <div class="card-body p-8" @keydown.escape.window="close()">
+                    <h3 class="card-title text-2xl mb-3">Request Item</h3>
+                    <p class="text-sm text-base-content/70 mb-6">
+                        Confirm how many you need. Your request will be sent to the donor for approval.
+                    </p>
+
+                    <template x-if="item">
+                        <form @submit.prevent="submit()">
+                            <div class="space-y-5">
+
+                                <div class="bg-base-200/50 rounded-lg p-4">
+                                    <p class="text-sm mb-2">
+                                        <strong>Item:</strong>
+                                        <span x-text="item.name"></span>
+                                    </p>
+                                    <p class="text-xs text-base-content/70">
+                                        <strong>Available quantity:</strong>
+                                        <span x-text="item.quantity"></span>
+                                    </p>
+                                </div>
+
+                                <div class="form-control">
+                                    <label class="label pb-2">
+                                        <span class="label-text font-medium">Requested quantity</span>
+                                    </label>
+                                    <input
+                                        x-model.number="quantity"
+                                        type="number"
+                                        class="input input-bordered h-12 w-full"
+                                        :min="1"
+                                        :max="item.quantity"
+                                        required
+                                        :disabled="loading"
+                                    />
+                                </div>
+
+                                <div x-show="error" class="alert alert-error rounded-xl">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="stroke-current shrink-0 h-6 w-6" fill="none" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                    </svg>
+                                    <span x-text="error"></span>
+                                </div>
+
+                                <div class="flex justify-end gap-4 mt-8 pt-6 border-t border-base-300">
+                                    <button
+                                        type="button"
+                                        class="btn btn-lg min-w-32"
+                                        @click="close()"
+                                        :disabled="loading">
+                                        Cancel
+                                    </button>
+                                    <button
+                                        type="submit"
+                                        class="btn btn-primary btn-lg min-w-32"
+                                        :disabled="loading || quantity <= 0 || quantity > item.quantity">
+                                        <span x-show="!loading">Submit Request</span>
+                                        <span x-show="loading" class="flex items-center gap-2">
+                                            <span class="loading loading-spinner loading-sm"></span>
+                                            Submitting...
+                                        </span>
+                                    </button>
+                                </div>
+
+                            </div>
+                        </form>
+                    </template>
+                </div>
+            </div>
+        </div>
+        <!-- end request modal -->
+
+    </div> <!-- card -->
+
+    </div> <!-- Content wrapper -->
+</div> <!-- wrapper -->
+{% endblock %}

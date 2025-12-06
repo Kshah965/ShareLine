@@ -1,0 +1,280 @@
+{% extends "base.html" %}
+
+{% block title %} — My Requests{% endblock %}
+
+{% block content %}
+<style>
+/* Force modals to center properly */
+dialog.modal {
+    position: fixed !important;
+    top: 50% !important;
+    left: 50% !important;
+    transform: translate(-50%, -50%) !important;
+    margin: 0 !important;
+    max-height: 90vh;
+    overflow-y: auto;
+    z-index: 9999 !important;
+    padding: 0 !important;
+    border: none !important;
+    background: transparent !important;
+}
+
+dialog.modal::backdrop {
+    background-color: rgba(0, 0, 0, 0.6);
+    z-index: 9998 !important;
+}
+
+.modal-backdrop {
+    z-index: 9998 !important;
+}
+
+/* Improve modal box styling */
+.modal-box {
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+    border-radius: 1.5rem !important;
+}
+</style>
+
+<div class="min-h-screen bg-base-200/20 py-10 relative">
+    <!-- Fixed background logo -->
+    <img src="/static/img/shareLine-logo.png" alt="ShareLine Logo Background"
+        class="fixed inset-0 w-full h-full object-contain opacity-10 pointer-events-none z-0" />
+
+    <!-- Content wrapper -->
+    <div class="relative z-10 flex justify-center items-start"
+
+    <!-- Alpine root -->
+    <div class="contents" x-data="{
+        requests: [],
+        loading: false,
+        error: null,
+
+        async init() {
+            await this.loadRequests();
+        },
+
+        async loadRequests() {
+            this.loading = true;
+            this.error = null;
+            try {
+                // Get all requests for this user
+                const allRequests = await Alpine.store('api').fetch('/requests/');
+                if (window.currentUser) {
+                    // Filter requests for current user
+                    const userRequests = allRequests.filter(req => req.requester_id === window.currentUser.id);
+
+                    // Fetch item details for each request
+                    this.requests = await Promise.all(
+                        userRequests.map(async (req) => {
+                            try {
+                                const item = await Alpine.store('api').fetch(`/items/${req.item_id}`);
+                                return { ...req, item };
+                            } catch (error) {
+                                console.error('Error loading item:', error);
+                                return { ...req, item: null };
+                            }
+                        })
+                    );
+                } else {
+                    this.requests = [];
+                }
+            } catch (error) {
+                this.error = error.message ?? 'Error loading requests.';
+                console.error('Error loading requests:', error);
+            } finally {
+                this.loading = false;
+            }
+        },
+
+        async cancelRequest(requestId) {
+            if (!confirm('Are you sure you want to cancel this request?')) {
+                return;
+            }
+            try {
+                await Alpine.store('api').fetch(`/requests/${requestId}`, {
+                    method: 'DELETE'
+                });
+                await this.loadRequests();
+            } catch (error) {
+                alert('Error canceling request: ' + (error.message ?? 'Unknown error'));
+            }
+        },
+
+        getStatusColor(status) {
+            const colors = {
+                'Pending': 'badge-warning',
+                'Approved': 'badge-success',
+                'Rejected': 'badge-error',
+                'Completed': 'badge-info'
+            };
+            return colors[status] || 'badge-ghost';
+        },
+
+        getStatusIcon(status) {
+            const icons = {
+                'Pending': '⏳',
+                'Approved': '✓',
+                'Rejected': '✗',
+                'Completed': '✓'
+            };
+            return icons[status] || '•';
+        }
+    }">
+
+        <!-- Main card wrapper for centering -->
+        <div class="w-full max-w-5xl px-4">
+
+            <!-- Main card -->
+            <div class="card w-full bg-base-100/95 backdrop-blur-sm shadow-xl rounded-2xl"
+
+                <!-- Card body -->
+                <div class="card-body space-y-6 p-8">
+
+                    <!-- Header -->
+                    <div class="flex justify-between items-start gap-4">
+                        <div>
+                            <h2 class="card-title text-3xl font-bold text-base-content mb-2">
+                                My Requests
+                            </h2>
+                            <p class="text-sm leading-relaxed text-base-content/70">
+                                Track the status of all your item requests. View details and manage pending requests.
+                            </p>
+                        </div>
+                        <a href="/affected" class="btn btn-outline btn-sm">
+                            ← Back to Dashboard
+                        </a>
+                    </div>
+
+                    <div class="divider"></div>
+
+                    <!-- Controls -->
+                    <div class="flex justify-between items-center gap-4">
+                        <div class="stats shadow bg-base-200">
+                            <div class="stat py-3 px-4">
+                                <div class="stat-title text-xs">Total Requests</div>
+                                <div class="stat-value text-2xl" x-text="requests.length"></div>
+                            </div>
+                            <div class="stat py-3 px-4">
+                                <div class="stat-title text-xs">Pending</div>
+                                <div class="stat-value text-warning text-2xl" x-text="requests.filter(r => r.status === 'Pending').length"></div>
+                            </div>
+                            <div class="stat py-3 px-4">
+                                <div class="stat-title text-xs">Approved</div>
+                                <div class="stat-value text-success text-2xl" x-text="requests.filter(r => r.status === 'Approved').length"></div>
+                            </div>
+                        </div>
+
+                        <button class="btn btn-outline" @click="loadRequests()" :disabled="loading">
+                            <span x-show="!loading">Refresh</span>
+                            <span x-show="loading">Loading...</span>
+                        </button>
+                    </div>
+
+                    <!-- Error message -->
+                    <div x-show="error" class="alert alert-error rounded-xl">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="stroke-current shrink-0 h-6 w-6" fill="none" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                        <span x-text="error"></span>
+                    </div>
+
+                    <!-- Loading state -->
+                    <div x-show="loading && requests.length === 0" class="text-center py-12">
+                        <span class="loading loading-spinner loading-lg"></span>
+                        <p class="text-base-content/70 mt-4">Loading your requests…</p>
+                    </div>
+
+                    <!-- Empty state -->
+                    <div x-show="!loading && requests.length === 0 && !error" class="text-center py-12">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-24 w-24 mx-auto mb-4 text-base-content/30" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
+                        </svg>
+                        <p class="text-base-content text-lg mb-2">No requests yet</p>
+                        <p class="text-base-content/70 text-sm mb-4">
+                            Start by browsing available items and making your first request!
+                        </p>
+                        <a href="/affected" class="btn btn-primary">
+                            Browse Items
+                        </a>
+                    </div>
+
+                    <!-- Requests list -->
+                    <div class="space-y-4" x-show="!loading && requests.length > 0">
+                        <template x-for="request in requests" :key="request.id">
+                            <div class="card bg-base-200 shadow-md hover:shadow-lg transition-shadow rounded-xl">
+                                <div class="card-body p-6">
+                                    <!-- Header with status badge -->
+                                    <div class="flex justify-between items-start gap-4 mb-4">
+                                        <div class="flex-1">
+                                            <h3 class="card-title text-xl mb-3">
+                                                <span x-text="request.item?.name || 'Item Request'"></span>
+                                            </h3>
+                                            <div class="flex gap-2 flex-wrap">
+                                                <span class="badge badge-lg"
+                                                      :class="getStatusColor(request.status)"
+                                                      x-text="getStatusIcon(request.status) + ' ' + request.status">
+                                                </span>
+                                                <span class="badge badge-outline badge-lg">
+                                                    Requested Qty: <span x-text="request.requested_quantity"></span>
+                                                </span>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <!-- Item Details -->
+                                    <div class="bg-base-300/50 rounded-lg p-4 mb-4">
+                                        <h4 class="text-sm font-semibold text-base-content/70 mb-3">Item Details</h4>
+                                        <div class="grid grid-cols-2 gap-3 text-sm">
+                                            <div>
+                                                <p class="text-base-content/60 text-xs mb-1">Item Name</p>
+                                                <p class="font-medium" x-text="request.item?.name || 'N/A'"></p>
+                                            </div>
+                                            <div>
+                                                <p class="text-base-content/60 text-xs mb-1">Available Quantity</p>
+                                                <p class="font-medium" x-text="request.item?.quantity || 'N/A'"></p>
+                                            </div>
+                                            <div>
+                                                <p class="text-base-content/60 text-xs mb-1">Category</p>
+                                                <p class="font-medium" x-text="request.item?.category || 'N/A'"></p>
+                                            </div>
+                                            <div>
+                                                <p class="text-base-content/60 text-xs mb-1">Pickup Location</p>
+                                                <p class="font-medium" x-text="request.item?.location || 'N/A'"></p>
+                                            </div>
+                                        </div>
+                                        <div x-show="request.item?.description" class="mt-3 pt-3 border-t border-base-300/50">
+                                            <p class="text-base-content/60 text-xs mb-1">Description</p>
+                                            <p class="text-sm" x-text="request.item?.description"></p>
+                                        </div>
+                                    </div>
+
+                                    <!-- Request info -->
+                                    <div class="space-y-2 text-sm">
+                                        <p x-show="request.created_at">
+                                            <strong>Requested on:</strong>
+                                            <span x-text="new Date(request.created_at).toLocaleDateString()"></span>
+                                        </p>
+                                    </div>
+
+                                    <!-- Actions -->
+                                    <div class="card-actions justify-end mt-4 pt-4 border-t border-base-300">
+                                        <button x-show="request.status === 'Pending'"
+                                                class="btn btn-sm btn-error"
+                                                @click="cancelRequest(request.id)">
+                                            Cancel Request
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </template>
+                    </div>
+
+                </div> <!-- card-body -->
+            </div> <!-- card -->
+
+        </div> <!-- centering wrapper -->
+
+    </div> <!-- Alpine root -->
+
+    </div> <!-- Content wrapper -->
+
+</div> <!-- wrapper -->
+{% endblock %}

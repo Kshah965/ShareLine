@@ -1,0 +1,29 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+
+# SQLite DB (do NOT commit live user data!)
+shareline.db
+
+# Virtual env
+.venv/
+venv/
+env/
+
+# Environment variables (security)
+.env
+
+# Node
+node_modules/
+dist/
+
+# Tailwind artifacts
+*.css.map
+
+# VS Code
+.vscode/
+
+# OS
+.DS_Store
+Thumbs.db

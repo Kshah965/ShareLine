@@ -1,0 +1,105 @@
+{% extends "base.html" %}
+
+{% block content %}
+
+{% if not current_user %}
+<div
+  class="hero min-h-screen"
+  style="background-image: url('/static/img/shareLine-logo.png'); background-size: contain; background-repeat: repeat; background-position: center;"
+>
+  <div class="hero-overlay bg-opacity-50"></div>
+
+  <div class="hero-content text-neutral-content text-center">
+    <div class="max-w-md">
+      <h1 class="mb-5 text-5xl font-bold">Welcome to ShareLine</h1>
+      <p class="mb-5">
+        ShareLine connects students who have extra with those who need support.
+        Whether you're here to donate items or request essentials, you're helping
+        build a stronger, more supportive community.
+      </p>
+      <a href="/login" class="btn btn-outline">Get Started</a>
+    </div>
+  </div>
+</div>
+
+{% else %}
+<div class="min-h-screen flex justify-center items-start py-10 bg-base-200">
+    <div class="card w-full max-w-3xl bg-base-100 card-md shadow-sm">
+        <div class="card-body space-y-6">
+
+            <!-- Welcome / Intro -->
+            <div>
+                <h2 class="card-title text-2xl font-bold">Welcome to ShareLine!</h2>
+                <p class="text-sm leading-relaxed">
+                    ShareLine is a community platform where students can donate and request items —
+                    clothing, books, supplies, and other essentials — to support one another.
+                    Now that you're logged in, you can browse available items or share your own to help others.
+                </p>
+            </div>
+
+            <hr />
+
+            <!-- How it works -->
+            <div>
+                <h2 class="text-xl font-semibold mb-2">How It Works</h2>
+                <ul class="list-disc list-inside space-y-1 text-sm">
+                    <li><strong>Donors</strong> can list items they want to share (with category, quantity, and location).</li>
+                    <li><strong>Requesters</strong> can browse available items and submit requests.</li>
+                    <li>ShareLine helps connect students who have extra with those who need it.</li>
+                </ul>
+            </div>
+
+            <hr />
+
+            <!-- Items Section Inside Card -->
+            <div id="items-section" x-data="itemsLoader('/items/')" 
+                 @items-updated.window="loadItems()">
+                <h2 class="text-xl font-semibold mb-4">Available Items</h2>
+
+                <button class="btn btn-primary mb-4"
+                        @click="loadItems()"
+                        :disabled="loading">
+                    <span x-show="!loading">Refresh Items</span>
+                    <span x-show="loading">Loading...</span>
+                </button>
+
+                <div x-show="error" class="alert alert-error mb-4">
+                    <span x-text="error"></span>
+                </div>
+
+                <div x-show="loading && items.length === 0" class="text-center py-4">
+                    <span class="loading loading-spinner loading-lg"></span>
+                    <p>Loading items…</p>
+                </div>
+
+                <div x-show="!loading && items.length === 0 && !error" class="text-center py-4">
+                    <p>No items available yet. Be the first to donate!</p>
+                </div>
+
+                <ul class="space-y-4" x-show="!loading && items.length > 0">
+                    <template x-for="item in items" :key="item.id">
+                        <li class="card bg-base-200 shadow-sm">
+                            <div class="card-body">
+                                <h3 class="card-title" x-text="item.name"></h3>
+                                <p class="text-sm text-base-content/70">
+                                    <strong>Category:</strong> <span x-text="item.category"></span> · 
+                                    <strong>Quantity:</strong> <span x-text="item.quantity"></span> · 
+                                    <strong>Status:</strong> <span x-text="item.status"></span>
+                                </p>
+                                <p class="text-sm">
+                                    <strong>Location:</strong> <span x-text="item.location"></span>
+                                </p>
+                                <p class="text-sm" x-text="item.description"></p>
+                            </div>
+                        </li>
+                    </template>
+                </ul>
+            </div>
+
+        </div>
+    </div>
+</div>
+
+{% endif %}
+
+{% endblock %}

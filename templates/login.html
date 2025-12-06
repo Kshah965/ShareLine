@@ -1,0 +1,107 @@
+{% extends "base.html" %}
+
+{% block title %} — Login{% endblock %}
+
+{% block content %}
+<div class="hero bg-base-200 min-h-screen">
+    <div class="hero-content flex-col lg:flex-row-reverse">
+        <div class="text-center lg:text-left">
+            <h1 class="text-5xl font-bold">Login now!</h1>
+            <p class="py-6">
+                Login to access ShareLine's community platform where you can donate and request items like clothes,
+                books, supplies, and essentials. Join us in connecting those in need with generous donors!
+            </p>
+        </div>
+        <div class="card bg-base-100 w-full max-w-sm shrink-0 shadow-2xl">
+            <div class="card-body" 
+                 x-data="{
+                     email: '',
+                     password: '',
+                     role: '',
+                     loading: false,
+                     error: null,
+                     async submit() {
+                         this.loading = true;
+                         this.error = null;
+                         try {
+                             const response = await Alpine.store('api').fetch('/login', {
+                                 method: 'POST',
+                                 body: JSON.stringify({
+                                     email: this.email,
+                                     password: this.password,
+                                     role: this.role
+                                 })
+                             });
+                             // Redirect based on role
+                             if (this.role === 'donor') {
+                                 window.location.href = '/donor';
+                             } else if (this.role === 'affected') {
+                                 window.location.href = '/affected';
+                             } else {
+                                 window.location.href = '/';
+                             }
+                         } catch (error) {
+                             this.error = error.message;
+                         } finally {
+                             this.loading = false;
+                         }
+                     }
+                 }"
+                 @submit.prevent="submit()">
+                <form>
+                    <fieldset class="fieldset">
+                        <label class="label">Email</label>
+                        <input x-model="email" 
+                               type="email" 
+                               class="input" 
+                               placeholder="Email" 
+                               required
+                               :disabled="loading" />
+
+                        <label class="label">Password</label>
+                        <input x-model="password" 
+                               type="password" 
+                               class="input" 
+                               placeholder="Password" 
+                               required
+                               minlength="6"
+                               :disabled="loading" />
+
+                        <label class="label">Role</label>
+                        <select x-model="role" 
+                                class="select select-info" 
+                                required
+                                :disabled="loading">
+                            <option disabled value=""> Select affected or donor </option>
+                            <option value="affected">affected</option>
+                            <option value="donor">donor</option>
+                        </select>
+
+                        <div><a class="link link-hover">Forgot password?</a></div>
+                        <div><a class="link link-hover" href="/register">Don't have an account? Register</a></div>
+
+                        <div x-show="error" class="alert alert-error mt-2">
+                            <span x-text="error"></span>
+                        </div>
+                        {% if error %}
+                        <div class="alert alert-error mt-2">
+                            <span>{{ error }}</span>
+                        </div>
+                        {% endif %}
+
+                        <button type="submit" 
+                                class="btn btn-neutral mt-4"
+                                :disabled="loading || !email || !password || !role">
+                            <span x-show="!loading">Login</span>
+                            <span x-show="loading">
+                                <span class="loading loading-spinner loading-sm"></span>
+                                Logging in...
+                            </span>
+                        </button>
+                    </fieldset>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

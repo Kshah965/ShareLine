@@ -1,0 +1,151 @@
+{% extends "base.html" %}
+
+{% block title %} — Register{% endblock %}
+
+{% block content %}
+<div class="hero bg-base-200 min-h-screen">
+    <div class="hero-content flex-col lg:flex-row-reverse">
+
+        <!-- Left text section -->
+        <div class="text-center lg:text-left">
+            <h1 class="text-5xl font-bold">Create your account</h1>
+            <p class="py-6">
+                Join ShareLine and become part of a community that supports students in need.
+                Whether you're here to donate or request essentials, your participation matters.
+            </p>
+        </div>
+
+        <!-- Right card (the form) -->
+        <div class="card bg-base-100 w-full max-w-sm shrink-0 shadow-2xl">
+            <div class="card-body" 
+                 x-data="{
+                     name: '',
+                     email: '',
+                     password: '',
+                     confirmPassword: '',
+                     role: '',
+                     loading: false,
+                     error: null,
+                     get passwordMatch() {
+                         return this.password === this.confirmPassword;
+                     },
+                     get isFormValid() {
+                         return this.name && this.email && 
+                                this.password && this.confirmPassword && 
+                                this.role && this.passwordMatch && 
+                                this.password.length >= 6;
+                     },
+                     async submit() {
+                         if (!this.passwordMatch) {
+                             this.error = 'Passwords do not match';
+                             return;
+                         }
+                         if (this.password.length < 6) {
+                             this.error = 'Password must be at least 6 characters';
+                             return;
+                         }
+                         this.loading = true;
+                         this.error = null;
+                         try {
+                             const response = await Alpine.store('api').fetch('/register', {
+                                 method: 'POST',
+                                 body: JSON.stringify({
+                                     name: this.name,
+                                     email: this.email,
+                                     password: this.password,
+                                     is_donor: this.role === 'donor',
+                                     is_affected: this.role === 'affected'
+                                 })
+                             });
+                             // Redirect based on role
+                             if (this.role === 'donor') {
+                                 window.location.href = '/donor';
+                             } else if (this.role === 'affected') {
+                                 window.location.href = '/affected';
+                             } else {
+                                 window.location.href = '/';
+                             }
+                         } catch (error) {
+                             this.error = error.message;
+                         } finally {
+                             this.loading = false;
+                         }
+                     }
+                 }"
+                 @submit.prevent="submit()">
+                <form>
+                    <fieldset class="fieldset">
+                        <label class="label">Full Name</label>
+                        <input x-model="name" 
+                               type="text" 
+                               class="input" 
+                               placeholder="John Doe" 
+                               required
+                               :disabled="loading" />
+
+                        <label class="label">Email</label>
+                        <input x-model="email" 
+                               type="email" 
+                               class="input" 
+                               placeholder="Email" 
+                               required
+                               :disabled="loading" />
+
+                        <label class="label">Password</label>
+                        <input x-model="password" 
+                               type="password" 
+                               class="input" 
+                               placeholder="Password"
+                               required 
+                               minlength="6"
+                               :disabled="loading" />
+
+                        <label class="label">Confirm Password</label>
+                        <input x-model="confirmPassword" 
+                               type="password" 
+                               class="input"
+                               placeholder="Re-enter password" 
+                               required 
+                               minlength="6"
+                               :class="{'input-error': confirmPassword && !passwordMatch}"
+                               :disabled="loading" />
+                        <div x-show="confirmPassword && !passwordMatch" class="text-sm text-error">
+                            Passwords do not match
+                        </div>
+
+                        <label class="label">Role</label>
+                        <select x-model="role" 
+                                class="select select-info" 
+                                required
+                                :disabled="loading">
+                            <option disabled value="">Select affected or donor</option>
+                            <option value="affected">affected</option>
+                            <option value="donor">donor</option>
+                        </select>
+
+                        <div x-show="error" class="alert alert-error mt-2">
+                            <span x-text="error"></span>
+                        </div>
+                        {% if error %}
+                        <div class="alert alert-error mt-2">
+                            <span>{{ error }}</span>
+                        </div>
+                        {% endif %}
+
+                        <button type="submit" 
+                                class="btn btn-neutral mt-4"
+                                :disabled="loading || !isFormValid">
+                            <span x-show="!loading">Register</span>
+                            <span x-show="loading">
+                                <span class="loading loading-spinner loading-sm"></span>
+                                Registering...
+                            </span>
+                        </button>
+                    </fieldset>
+                </form>
+            </div>
+        </div>
+
+    </div>
+</div>
+{% endblock %}
