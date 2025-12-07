@@ -127,22 +127,7 @@ PATCH /requests/{id}
 - `shareline.db` is **ignored** so no personal data is committed
 - `node_modules/` is **ignored**
 
-✔️ Safe for public posting on GitHub
 
----
-
-## 🧑‍💻 Author
-
-**Brunna M. (aka Kshah)**
-UMass Amherst — CICS
-
----
-
-## 📄 License
-
-MIT (feel free to reuse and modify)
-
----
 
 ## 🌟 Future Improvements
 
