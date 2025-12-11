@@ -67,6 +67,29 @@
         requestsLoading: false,
         requestsError: null,
 
+        /* Flash messaging */
+        flashMessage: null,
+        flashTimeoutId: null,
+
+        setFlash(message) {
+          this.flashMessage = message;
+          if (this.flashTimeoutId) {
+            clearTimeout(this.flashTimeoutId);
+          }
+          this.flashTimeoutId = setTimeout(() => {
+            this.flashMessage = null;
+            this.flashTimeoutId = null;
+          }, 4000);
+        },
+
+        clearFlash() {
+          if (this.flashTimeoutId) {
+            clearTimeout(this.flashTimeoutId);
+            this.flashTimeoutId = null;
+          }
+          this.flashMessage = null;
+        },
+
         openDonate() {
           this.showDonateForm = true;
           this.donateError = null;
@@ -154,10 +177,12 @@
             return;
           }
           try {
-            await Alpine.store('api').fetch(`/items/${itemId}`, {
+            const result = await Alpine.store('api').fetch(`/items/${itemId}`, {
               method: 'DELETE'
             });
             await this.loadItems();
+            this.setFlash(result?.detail ?? 'Item deleted successfully.');
+            window.dispatchEvent(new CustomEvent('items-updated'));
           } catch (error) {
             alert('Error deleting item: ' + (error.message ?? 'Unknown error'));
           }
@@ -207,6 +232,7 @@
             if (this.selectedItem) {
               await this.loadRequestsForItem(this.selectedItem);
             }
+            window.dispatchEvent(new CustomEvent('items-updated'));
           } catch (error) {
             console.error('Error updating request:', error);
             alert(error.message ?? 'Error updating request status.');
@@ -271,6 +297,14 @@
                             <span x-text="itemsError"></span>
                         </div>
 
+                        <div x-show="flashMessage" x-transition
+                            class="alert alert-success mb-4 rounded-xl flex items-center justify-between gap-4">
+                            <span x-text="flashMessage"></span>
+                            <button type="button" class="btn btn-sm btn-ghost" @click="clearFlash()">
+                                Close
+                            </button>
+                        </div>
+
                         <div x-show="itemsLoading && items.length === 0" class="text-center py-4">
                             <span class="loading loading-spinner loading-lg"></span>
                             <p class="text-base-content/70">Loading your items…</p>
@@ -307,7 +341,8 @@
                                         <p class="text-sm" x-text="item.description"></p>
 
                                         <div class="card-actions justify-between mt-2">
-                                            <button @click="deleteItem(item.id)" class="btn btn-sm btn-error">
+                                            <button @click="deleteItem(item.id)" class="btn btn-sm btn-error"
+                                                :disabled="item.status === 'Completed'">
                                                 Delete
                                             </button>
 

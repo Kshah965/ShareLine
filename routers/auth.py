@@ -15,7 +15,6 @@ from sqlmodel import select
 router = APIRouter(tags=["auth"])
 templates = Jinja2Templates(directory="templates")
 
-# ----- Security helpers -----
 
 # in production: use env var, not random each run
 SECRET_KEY = secrets.token_hex(32)

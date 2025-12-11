@@ -2,7 +2,7 @@
 
 from typing import Optional, List
 
-from fastapi import APIRouter, HTTPException, Request, Response
+from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from sqlmodel import select
@@ -113,7 +113,7 @@ def list_items(
     return results
 
 
-@router.delete("/{item_id}", status_code=204)
+@router.delete("/{item_id}")
 def delete_item(
     item_id: int,
     session: SessionDep,
@@ -140,18 +140,10 @@ def delete_item(
             detail="You can only delete items you donated.",
         )
 
-    # Block delete if there are pending requests
-    pending = session.exec(
-        select(Request).where(
-            Request.item_id == item_id,
-            Request.status == "Pending",
-        )
-    ).first()
-
-    if pending:
+    if item.status == "Completed":
         raise HTTPException(
             status_code=400,
-            detail="Cannot delete item with pending requests.",
+            detail="Completed items cannot be deleted.",
         )
 
     # If you also want to clean up old non-pending requests, you *can* do:
@@ -161,7 +153,7 @@ def delete_item(
 
     session.delete(item)
     session.commit()
-    return Response(status_code=204)
+    return {"detail": "Item deleted successfully"}
 
 @router.get("/fragments/list", response_class=HTMLResponse)
 def items_list_fragment(request: Request, session: SessionDep):

@@ -28,11 +28,22 @@
                         const error = await response.json().catch(() => ({ detail: 'Request failed' }));
                         throw new Error(error.detail || `HTTP ${response.status}`);
                     }
-                    return response.json();
+                    const contentLength = response.headers.get('content-length');
+                    const contentType = response.headers.get('content-type') || '';
+
+                    if (response.status === 204 || contentLength === '0' || !contentType) {
+                        return null;
+                    }
+
+                    if (contentType.includes('application/json')) {
+                        return response.json();
+                    }
+
+                    return null;
                 }
             });
 
-            // Items loader component - uses JSON API instead of HTML fragments
+            // Items loader component
             Alpine.data('itemsLoader', (apiUrl) => ({
                 items: [],
                 loading: false,
@@ -54,38 +65,7 @@
                 }
             }));
 
-            // Form handler component
-            Alpine.data('formHandler', (submitUrl, options = {}) => ({
-                loading: false,
-                error: null,
-                success: false,
-                async submit(data) {
-                    this.loading = true;
-                    this.error = null;
-                    this.success = false;
-                    try {
-                        const response = await Alpine.store('api').fetch(submitUrl, {
-                            method: 'POST',
-                            body: JSON.stringify(data)
-                        });
-                        this.success = true;
-                        if (options.onSuccess) {
-                            options.onSuccess(response);
-                        }
-                        return response;
-                    } catch (error) {
-                        this.error = error.message;
-                        if (options.onError) {
-                            options.onError(error);
-                        }
-                        throw error;
-                    } finally {
-                        this.loading = false;
-                    }
-                }
-            }));
-
-            // Request item component - use Alpine store for global access
+            // Request item component
             Alpine.store('requestItem', {
                 showModal: false,
                 item: null,
@@ -126,7 +106,6 @@
                             body: JSON.stringify(requestData)
                         });
                         this.close();
-                        // Trigger a custom event to refresh items
                         window.dispatchEvent(new CustomEvent('items-updated'));
                         alert('Request submitted successfully!');
                     } catch (error) {
@@ -136,24 +115,6 @@
                     }
                 }
             });
-
-            // Delete item component
-            Alpine.data('deleteItem', (onSuccess) => ({
-                async delete(itemId) {
-                    if (!confirm('Are you sure you want to delete this item?')) {
-                        return;
-                    }
-                    try {
-                        await Alpine.store('api').fetch(`/items/${itemId}`, {
-                            method: 'DELETE'
-                        });
-                        if (onSuccess) onSuccess();
-                        window.dispatchEvent(new CustomEvent('items-updated'));
-                    } catch (error) {
-                        alert('Error deleting item: ' + error.message);
-                    }
-                }
-            }));
         });
     </script>
 </head>
@@ -163,15 +124,15 @@
     <script>
         window.currentUser = {
             id: {{ current_user.id }},
-        name: "{{ current_user.name }}",
+            name: "{{ current_user.name }}",
             email: "{{ current_user.email }}",
-                role: "{{ current_role }}"
+            role: "{{ current_role }}"
         };
     </script>
     {% endif %}
 
-    <!-- 🌟 NAVBAR (DaisyUI) -->
-    <div class="navbar bg-base-100 shadow-sm z-20 relative">
+    <!-- Navbar -->
+    <div class="navbar bg-base-100 shadow-sm sticky top-0 z-50">
         <div class="navbar-start">
             <img src="/static/img/shareLine-logo.png" alt="ShareLine Logo" class="w-10 h-10 mr-2">
             <a class="btn btn-ghost text-xl" href="/">ShareLine</a>
@@ -192,17 +153,13 @@
         </div>
     </div>
 
-    <!-- Faint background logo (fixed behind everything) -->
-    <img src="/static/img/shareLine-logo.png" alt="ShareLine Logo Background"
-        class="fixed inset-0 w-full h-full object-contain opacity-1 pointer-events-none -z-10" />
-
     <!-- Main content -->
-    <main class="flex-1 relative z-10">
+    <main class="relative">
         {% block content %}{% endblock %}
     </main>
 
     <!-- Footer -->
-    <footer class="footer footer-center p-4 bg-base-100 text-base-content border-t mt-8 relative z-10">
+    <footer class="footer footer-center p-4 bg-base-100 text-base-content border-t mt-8">
         <aside>
             <p>© 2025 ShareLine · Built for COMPSCI 326 Web Programming</p>
         </aside>

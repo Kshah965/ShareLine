@@ -9,6 +9,28 @@ from models import Request as RequestModel, Item, User, Request
 from schemas import RequestCreate, RequestStatusUpdate
 from .auth import UserRoleDep
 
+
+def _refresh_item_status(session: SessionDep, item: Item) -> None:
+    """
+    Keep an item's status in sync with its remaining quantity and
+    the presence of any pending requests.
+    """
+    if item.id is None:
+        return
+
+    if item.quantity <= 0:
+        item.status = "Completed"
+        return
+
+    has_pending = session.exec(
+        select(RequestModel.id).where(
+            RequestModel.item_id == item.id,
+            RequestModel.status == "Pending",
+        )
+    ).first()
+
+    item.status = "Requested" if has_pending else "Available"
+
 router = APIRouter(tags=["requests"])
 
 
@@ -145,18 +167,15 @@ def update_request_status(
         # Decrease quantity
         item.quantity -= db_request.requested_quantity
 
-        # If item is fully used, mark as Completed (will disappear from "Available")
-        if item.quantity == 0:
-            item.status = "Completed"
-
         db_request.status = "Approved"
-        session.add(item)
 
     elif update.status == "Rejected":
         db_request.status = "Rejected"
 
     # If someone sent "Pending" again, we ignore it and keep it Pending.
+    _refresh_item_status(session, item)
 
+    session.add(item)
     session.add(db_request)
     session.commit()
     session.refresh(db_request)
@@ -176,6 +195,13 @@ def delete_request(
     if req is None:
         raise HTTPException(status_code=404, detail="Request not found")
 
+    item = session.get(Item, req.item_id)
+    if item is None:
+        raise HTTPException(
+            status_code=400,
+            detail="Associated item not found",
+        )
+
     # If affected user: can only delete *their own* request
     if role == "affected":
         if req.requester_id != user.id:
@@ -186,8 +212,7 @@ def delete_request(
 
     # If donor: can delete requests on their own items
     elif role == "donor":
-        item = session.get(Item, req.item_id)
-        if item is None or item.donor_id != user.id:
+        if item.donor_id != user.id:
             raise HTTPException(
                 status_code=403,
                 detail="Donors can only delete requests for their items.",
@@ -196,6 +221,7 @@ def delete_request(
     # (If you ever add 'admin', you could allow them to delete anything.)
 
     session.delete(req)
+    _refresh_item_status(session, item)
+    session.add(item)
     session.commit()
     return Response(status_code=204)
-

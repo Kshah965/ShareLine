@@ -52,7 +52,7 @@
             <hr />
 
             <!-- Items Section Inside Card -->
-            <div id="items-section" x-data="itemsLoader('/items/')" 
+            <div id="items-section" x-data="itemsLoader('/items/')"
                  @items-updated.window="loadItems()">
                 <h2 class="text-xl font-semibold mb-4">Available Items</h2>
 
@@ -82,8 +82,8 @@
                             <div class="card-body">
                                 <h3 class="card-title" x-text="item.name"></h3>
                                 <p class="text-sm text-base-content/70">
-                                    <strong>Category:</strong> <span x-text="item.category"></span> · 
-                                    <strong>Quantity:</strong> <span x-text="item.quantity"></span> · 
+                                    <strong>Category:</strong> <span x-text="item.category"></span> ·
+                                    <strong>Quantity:</strong> <span x-text="item.quantity"></span> ·
                                     <strong>Status:</strong> <span x-text="item.status"></span>
                                 </p>
                                 <p class="text-sm">
