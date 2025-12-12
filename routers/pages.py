@@ -13,7 +13,7 @@ templates = Jinja2Templates(directory="templates")
 @router.get("/affected/requests", response_class=HTMLResponse)
 async def affected_requests_page(
     request: Request,
-    current: CurrentUserRoleDep  # Uses your existing auth dependency
+    current: CurrentUserRoleDep
 ):
     """
     Display the affected user's request tracking page.
@@ -37,8 +37,7 @@ async def affected_requests_page(
     )
 
 
-# You can move your existing dashboard routes here from auth.py
-# to keep all page routes in one place (optional but recommended)
+
 
 @router.get("/donor", response_class=HTMLResponse)
 async def donor_dashboard(

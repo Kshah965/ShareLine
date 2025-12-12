@@ -1,0 +1,57 @@
+<div class="card bg-base-100 w-full max-w-sm shadow-2xl rounded-2xl" id="donate-form-card">
+    <div class="card-body p-8">
+        <h3 class="card-title text-2xl mb-3">Donate an Item</h3>
+        <p class="text-sm text-base-content/70 mb-6">
+            Share items you can offer. Affected students will be able to request these.
+        </p>
+
+        {% if flash_message %}
+        <div class="alert alert-success rounded-xl mb-4">
+            <span>{{ flash_message.text }}</span>
+        </div>
+        {% endif %}
+
+        {% if errors %}
+        <div class="alert alert-error rounded-xl mb-4">
+            <ul class="list-disc list-inside text-sm">
+                {% for err in errors %}
+                <li>{{ err }}</li>
+                {% endfor %}
+            </ul>
+        </div>
+        {% endif %}
+
+        <form hx-post="/ui/donor/items" hx-target="#donate-form-card" hx-swap="outerHTML">
+            <div class="space-y-5">
+                <div class="form-control">
+                    <label class="label pb-2"><span class="label-text font-medium">Item name</span></label>
+                    <input type="text" name="name" class="input input-bordered h-12 w-full"
+                        value="{{ form_data.name or '' }}" required />
+                </div>
+                <div class="form-control">
+                    <label class="label pb-2"><span class="label-text font-medium">Category</span></label>
+                    <input type="text" name="category" class="input input-bordered h-12 w-full"
+                        value="{{ form_data.category or '' }}" required />
+                </div>
+                <div class="form-control">
+                    <label class="label pb-2"><span class="label-text font-medium">Quantity</span></label>
+                    <input type="number" name="quantity" min="1" class="input input-bordered h-12 w-full"
+                        value="{{ form_data.quantity or 1 }}" required />
+                </div>
+                <div class="form-control">
+                    <label class="label pb-2"><span class="label-text font-medium">Location</span></label>
+                    <input type="text" name="location" class="input input-bordered h-12 w-full"
+                        value="{{ form_data.location or '' }}" required />
+                </div>
+                <div class="form-control">
+                    <label class="label pb-2"><span class="label-text font-medium">Description</span></label>
+                    <textarea name="description" class="textarea textarea-bordered w-full" rows="3" required>{{ form_data.description or '' }}</textarea>
+                </div>
+                <div class="flex justify-end gap-4 mt-8 pt-6 border-t border-base-300">
+                    <button type="button" class="btn btn-lg min-w-32" onclick="closeDonateModal()">Cancel</button>
+                    <button type="submit" class="btn btn-primary btn-lg min-w-32">Donate Item</button>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>

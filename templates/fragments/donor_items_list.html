@@ -1,0 +1,60 @@
+<div id="donor-items-list" class="space-y-4">
+    {% if flash_message %}
+    <div class="alert rounded-xl {{ 'alert-success' if flash_message.kind == 'success' else 'alert-error' }}">
+        <span>{{ flash_message.text }}</span>
+    </div>
+    {% endif %}
+
+    {% if items %}
+    <ul class="space-y-6">
+        {% for item in items %}
+        <li class="card bg-base-200 shadow-sm rounded-xl">
+            <div class="card-body">
+                <h3 class="card-title">{{ item.name }}</h3>
+                <p class="text-sm">
+                    <strong>Category:</strong> {{ item.category }} ·
+                    <strong>Quantity:</strong> {{ item.quantity }} ·
+                    <strong>Status:</strong> {{ item.status }}
+                </p>
+                <p class="text-sm">
+                    <strong>Location:</strong> {{ item.location }}
+                </p>
+                <p class="text-sm">{{ item.description }}</p>
+
+                <div class="card-actions justify-between mt-2">
+                    <button
+                        class="btn btn-sm btn-error"
+                        hx-post="/ui/donor/items/{{ item.id }}/delete"
+                        hx-target="#donor-items-list"
+                        hx-swap="outerHTML"
+                        hx-confirm="Delete this item?"
+                        {% if item.status == 'Completed' %}disabled{% endif %}>
+                        Delete
+                    </button>
+
+                    {% if item.status == 'Requested' %}
+                    <button
+                        class="btn btn-sm btn-outline"
+                        type="button"
+                        onclick="openRequestsModal()"
+                        hx-get="/ui/donor/items/{{ item.id }}/requests"
+                        hx-target="#requests-modal-content"
+                        hx-swap="innerHTML"
+                        hx-on:htmx:afterSwap="openRequestsModal()">
+                        Review Requests
+                    </button>
+                    {% endif %}
+                </div>
+            </div>
+        </li>
+        {% endfor %}
+    </ul>
+    {% else %}
+    <div class="text-center py-4 text-base-content/70">
+        <p>No items yet.</p>
+        <button type="button" class="link" onclick="openDonateModal()">
+            Create your first item!
+        </button>
+    </div>
+    {% endif %}
+</div>

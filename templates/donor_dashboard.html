@@ -4,7 +4,6 @@
 
 {% block content %}
 <style>
-    /* Force modals to center properly */
     dialog.modal {
         position: fixed !important;
         top: 50% !important;
@@ -28,7 +27,6 @@
         z-index: 9998 !important;
     }
 
-    /* Improve modal box styling */
     .modal-box {
         box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
         border-radius: 1.5rem !important;
@@ -36,219 +34,13 @@
 </style>
 
 <div class="min-h-screen bg-base-200/20 py-10 relative">
-    <!-- Fixed background logo -->
     <img src="/static/img/shareLine-logo.png" alt="ShareLine Logo Background"
         class="fixed inset-0 w-full h-full object-contain opacity-10 pointer-events-none z-0" />
 
-    <!-- Content wrapper -->
     <div class="relative z-10 flex justify-center items-start px-4">
-
-    <!-- 🔹 Alpine root wraps everything -->
-    <div class="contents" x-data="{
-        /* Donate modal state */
-        showDonateForm: false,
-        name: '',
-        category: '',
-        quantity: 1,
-        location: '',
-        description: '',
-        donateLoading: false,
-        donateError: null,
-
-        /* Items (donor's own items) */
-        items: [],
-        itemsLoading: false,
-        itemsError: null,
-
-        /* Requests modal state */
-        showRequestsModal: false,
-        selectedItem: null,
-        requests: [],
-        requestsLoading: false,
-        requestsError: null,
-
-        /* Flash messaging */
-        flashMessage: null,
-        flashTimeoutId: null,
-
-        setFlash(message) {
-          this.flashMessage = message;
-          if (this.flashTimeoutId) {
-            clearTimeout(this.flashTimeoutId);
-          }
-          this.flashTimeoutId = setTimeout(() => {
-            this.flashMessage = null;
-            this.flashTimeoutId = null;
-          }, 4000);
-        },
-
-        clearFlash() {
-          if (this.flashTimeoutId) {
-            clearTimeout(this.flashTimeoutId);
-            this.flashTimeoutId = null;
-          }
-          this.flashMessage = null;
-        },
-
-        openDonate() {
-          this.showDonateForm = true;
-          this.donateError = null;
-          // Prevent body scroll when modal is open
-          document.body.style.overflow = 'hidden';
-        },
-        closeDonate() {
-          if (this.donateLoading) return;
-          this.showDonateForm = false;
-          // Restore body scroll
-          document.body.style.overflow = '';
-        },
-
-        async submitDonate() {
-          if (!window.currentUser || !window.currentUser.id) {
-            this.donateError = 'You must be logged in as a donor.';
-            return;
-          }
-          this.donateLoading = true;
-          this.donateError = null;
-          try {
-            const body = {
-              donor_id: window.currentUser.id,
-              name: this.name,
-              category: this.category,
-              quantity: Number(this.quantity),
-              description: this.description,
-              location: this.location,
-            };
-
-            await Alpine.store('api').fetch('/items/', {
-              method: 'POST',
-              body: JSON.stringify(body),
-            });
-
-            // reset fields
-            this.name = '';
-            this.category = '';
-            this.quantity = 1;
-            this.location = '';
-            this.description = '';
-
-            // close modal
-            this.closeDonate();
-
-            // refresh donor's items
-            await this.loadItems();
-
-            // also notify any other listeners
-            window.dispatchEvent(new CustomEvent('items-updated'));
-          } catch (error) {
-            console.error(error);
-            this.donateError = error.message ?? 'Something went wrong while donating this item.';
-          } finally {
-            this.donateLoading = false;
-          }
-        },
-
-        /* Lifecycle: load items on init */
-        async init() {
-          await this.loadItems();
-        },
-
-        /* Load all items for this donor */
-        async loadItems() {
-          this.itemsLoading = true;
-          this.itemsError = null;
-          try {
-            const allItems = await Alpine.store('api').fetch('/items/');
-            if (window.currentUser) {
-              this.items = allItems.filter(item => item.donor_id === window.currentUser.id);
-            } else {
-              this.items = [];
-            }
-          } catch (error) {
-            this.itemsError = error.message ?? 'Error loading items.';
-            console.error('Error loading items:', error);
-          } finally {
-            this.itemsLoading = false;
-          }
-        },
-
-        async deleteItem(itemId) {
-          if (!confirm('Are you sure you want to delete this item?')) {
-            return;
-          }
-          try {
-            const result = await Alpine.store('api').fetch(`/items/${itemId}`, {
-              method: 'DELETE'
-            });
-            await this.loadItems();
-            this.setFlash(result?.detail ?? 'Item deleted successfully.');
-            window.dispatchEvent(new CustomEvent('items-updated'));
-          } catch (error) {
-            alert('Error deleting item: ' + (error.message ?? 'Unknown error'));
-          }
-        },
-
-        /* Load requests for a specific item (for this donor) */
-        async loadRequestsForItem(item) {
-          this.selectedItem = item;
-          this.showRequestsModal = true;
-          this.requestsLoading = true;
-          this.requestsError = null;
-          this.requests = [];
-
-          // Open the dialog
-          this.$nextTick(() => {
-            this.$refs.requestsModal?.showModal();
-          });
-
-          try {
-            const data = await Alpine.store('api').fetch(`/requests/?item_id=${item.id}`);
-            this.requests = data;
-          } catch (error) {
-            console.error('Error loading requests:', error);
-            this.requestsError = error.message ?? 'Could not load requests.';
-          } finally {
-            this.requestsLoading = false;
-          }
-        },
-
-        closeRequestsModal() {
-          this.showRequestsModal = false;
-          this.$refs.requestsModal?.close();
-        },
-
-        /* PATCH /requests/{request_id} */
-        async updateRequestStatus(requestId, newStatus) {
-          console.log('updateRequestStatus called with:', requestId, newStatus);
-
-          try {
-            await Alpine.store('api').fetch(`/requests/${requestId}`, {
-              method: 'PATCH',
-              body: JSON.stringify({ status: newStatus })
-            });
-
-            // Refresh items + currently viewed requests
-            await this.loadItems();
-            if (this.selectedItem) {
-              await this.loadRequestsForItem(this.selectedItem);
-            }
-            window.dispatchEvent(new CustomEvent('items-updated'));
-          } catch (error) {
-            console.error('Error updating request:', error);
-            alert(error.message ?? 'Error updating request status.');
-          }
-        }
-      }" @items-updated.window="loadItems()">
-
-        <!-- 🎴 Main donor card -->
         <div class="w-full max-w-6xl">
-
             <div class="card w-full bg-base-100/95 backdrop-blur-sm shadow-xl rounded-2xl">
-
-                <!-- Card body -->
                 <div class="card-body space-y-6 p-8">
-
-                    <!-- Header / intro -->
                     <div>
                         <h2 class="card-title text-3xl font-bold mb-2">
                             Welcome, {{ current_user.name }}!
@@ -261,7 +53,6 @@
 
                     <div class="divider"></div>
 
-                    <!-- Donate new item row -->
                     <div class="flex justify-between items-center gap-4">
                         <div>
                             <h3 class="text-lg font-semibold">
@@ -271,308 +62,133 @@
                                 List a new item so affected students can find and request it.
                             </p>
                         </div>
-                        <button class="btn btn-primary" @click="openDonate()">
+                        <button
+                            class="btn btn-primary"
+                            onclick="openDonateModal()"
+                            hx-get="/ui/donor/donate-form"
+                            hx-target="#donate-form-container"
+                            hx-swap="innerHTML">
                             + Donate an Item
                         </button>
                     </div>
 
                     <div class="divider"></div>
 
-                    <!-- My items section -->
                     <div id="my-items-section">
-                        <h3 class="text-lg font-semibold mb-2">
-                            My Items
-                        </h3>
-                        <p class="text-xs mb-3 text-base-content/70">
-                            These are the items you've listed as available on ShareLine.
-                        </p>
-
-                        <!-- Refresh button -->
-                        <button class="btn btn-sm btn-outline mb-3" @click="loadItems()" :disabled="itemsLoading">
-                            <span x-show="!itemsLoading">Refresh My Items</span>
-                            <span x-show="itemsLoading">Loading...</span>
-                        </button>
-
-                        <div x-show="itemsError" class="alert alert-error mb-4 rounded-xl">
-                            <span x-text="itemsError"></span>
-                        </div>
-
-                        <div x-show="flashMessage" x-transition
-                            class="alert alert-success mb-4 rounded-xl flex items-center justify-between gap-4">
-                            <span x-text="flashMessage"></span>
-                            <button type="button" class="btn btn-sm btn-ghost" @click="clearFlash()">
-                                Close
+                        <div class="flex items-center justify-between gap-3">
+                            <div>
+                                <h3 class="text-lg font-semibold mb-2">
+                                    My Items
+                                </h3>
+                                <p class="text-xs text-base-content/70">
+                                    These are the items you've listed as available on ShareLine.
+                                </p>
+                            </div>
+                            <button
+                                class="btn btn-sm btn-outline"
+                                hx-get="/ui/donor/items"
+                                hx-target="#donor-items-list"
+                                hx-swap="outerHTML">
+                                Refresh My Items
                             </button>
                         </div>
 
-                        <div x-show="itemsLoading && items.length === 0" class="text-center py-4">
-                            <span class="loading loading-spinner loading-lg"></span>
-                            <p class="text-base-content/70">Loading your items…</p>
+                        <div id="donor-items-list"
+                             class="mt-4"
+                             hx-get="/ui/donor/items"
+                             hx-trigger="load, donor-items-refresh from:body"
+                             hx-target="this"
+                             hx-swap="outerHTML">
+                            <div class="text-center py-6 text-base-content/60">
+                                <span class="loading loading-spinner loading-lg mb-2"></span>
+                                <p>Loading your items…</p>
+                            </div>
                         </div>
+                    </div>
 
-                        <div x-show="!itemsLoading && items.length === 0 && !itemsError" class="text-center py-4">
-                            <p class="text-base-content/70">
-                                No items yet.
-                                <button class="link" @click="openDonate()">
-                                    Create your first item!
-                                </button>
-                            </p>
-                        </div>
-
-                        <ul class="space-y-6" x-show="!itemsLoading && items.length > 0">
-                            <template x-for="item in items" :key="item.id">
-                                <li class="card bg-base-200 shadow-sm rounded-xl">
-                                    <div class="card-body">
-                                        <h3 class="card-title" x-text="item.name"></h3>
-                                        <p class="text-sm">
-                                            <strong>Category:</strong>
-                                            <span x-text="item.category"></span>
-                                            ·
-                                            <strong>Quantity:</strong>
-                                            <span x-text="item.quantity"></span>
-                                            ·
-                                            <strong>Status:</strong>
-                                            <span x-text="item.status"></span>
-                                        </p>
-                                        <p class="text-sm">
-                                            <strong>Location:</strong>
-                                            <span x-text="item.location"></span>
-                                        </p>
-                                        <p class="text-sm" x-text="item.description"></p>
-
-                                        <div class="card-actions justify-between mt-2">
-                                            <button @click="deleteItem(item.id)" class="btn btn-sm btn-error"
-                                                :disabled="item.status === 'Completed'">
-                                                Delete
-                                            </button>
-
-                                            <!-- Only show when item is in Requested state -->
-                                            <button class="btn btn-sm btn-outline" x-show="item.status === 'Requested'"
-                                                @click="loadRequestsForItem(item)">
-                                                Review Requests
-                                            </button>
-                                        </div>
-                                    </div>
-                                </li>
-                            </template>
-                        </ul>
-                    </div> <!-- my-items-section -->
-
-                </div> <!-- card-body -->
-
-            </div> <!-- card -->
-
-        </div> <!-- centering wrapper -->
-
-        <!-- 🔹 Donate Item modal -->
-        <div
-            x-show="showDonateForm"
-            class="fixed inset-0 bg-black/60 flex items-center justify-center p-4 z-20"
-            x-transition.opacity
-            @click.self="closeDonate()"
-        >
-            <div
-                class="card bg-base-100 w-full max-w-sm shadow-2xl rounded-2xl"
-                @click.outside="closeDonate()"
-            >
-                <div class="card-body p-8" @keydown.escape.window="closeDonate()">
-                    <h3 class="card-title text-2xl mb-3">Donate an Item</h3>
-                    <p class="text-sm text-base-content/70 mb-6">
-                        Share items you can offer. Affected students will be able to request these.
-                    </p>
-
-                    <form @submit.prevent="submitDonate()">
-                        <div class="space-y-5">
-
-                            <div class="form-control">
-                                <label class="label pb-2">
-                                    <span class="label-text font-medium">Item name</span>
-                                </label>
-                                <input type="text" class="input input-bordered h-12 w-full" placeholder="e.g. Winter coat"
-                                    x-model="name" :disabled="donateLoading" required />
-                            </div>
-
-                            <div class="form-control">
-                                <label class="label pb-2">
-                                    <span class="label-text font-medium">Category</span>
-                                </label>
-                                <input type="text" class="input input-bordered h-12 w-full"
-                                    placeholder="e.g. Clothing, Food, Hygiene" x-model="category" :disabled="donateLoading"
-                                    required />
-                            </div>
-
-                            <div class="form-control">
-                                <label class="label pb-2">
-                                    <span class="label-text font-medium">Quantity</span>
-                                </label>
-                                <input type="number" min="1" class="input input-bordered h-12 w-full" placeholder="10"
-                                    x-model="quantity" :disabled="donateLoading" required />
-                            </div>
-
-                            <div class="form-control">
-                                <label class="label pb-2">
-                                    <span class="label-text font-medium">Location</span>
-                                </label>
-                                <input type="text" class="input input-bordered h-12 w-full"
-                                    placeholder="e.g. Orchard Hill, Campus Center" x-model="location"
-                                    :disabled="donateLoading" required />
-                            </div>
-
-                            <div class="form-control">
-                                <label class="label pb-2">
-                                    <span class="label-text font-medium">Description</span>
-                                </label>
-                                <textarea class="textarea textarea-bordered w-full" rows="3"
-                                    placeholder="Short note about condition, size, or extra details" x-model="description"
-                                    :disabled="donateLoading" required></textarea>
-                            </div>
-
-                            <div x-show="donateError" class="alert alert-error rounded-xl">
-                                <svg xmlns="http://www.w3.org/2000/svg" class="stroke-current shrink-0 h-6 w-6" fill="none" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                </svg>
-                                <span x-text="donateError"></span>
-                            </div>
-
-                            <div class="flex justify-end gap-4 mt-8 pt-6 border-t border-base-300">
-                                <button type="button" class="btn btn-lg min-w-32" @click="closeDonate()"
-                                    :disabled="donateLoading">
-                                    Cancel
-                                </button>
-                                <button type="submit" class="btn btn-primary btn-lg min-w-32"
-                                    :disabled="donateLoading || !name || !category || !quantity || !location || !description">
-                                    <span x-show="!donateLoading">Donate Item</span>
-                                    <span x-show="donateLoading" class="flex items-center gap-2">
-                                        <span class="loading loading-spinner loading-sm"></span>
-                                        Saving...
-                                    </span>
-                                </button>
-                            </div>
-
-                        </div>
-                    </form>
                 </div>
             </div>
         </div>
+    </div>
+</div>
 
-        <!-- 🔹 Requests review modal -->
-        <dialog x-ref="requestsModal" class="modal" @close="showRequestsModal = false">
-            <div class="modal-box bg-base-100 max-w-2xl w-full p-8">
-                <!-- Header -->
-                <div class="flex justify-between items-start gap-4 mb-6">
-                    <div class="flex-1">
-                        <h3 class="text-2xl font-bold mb-2">
-                            Requests for <span x-text="selectedItem ? selectedItem.name : ''" class="text-primary"></span>
-                        </h3>
-                        <div class="flex gap-2" x-show="selectedItem">
-                            <span class="badge badge-outline badge-lg">
-                                <span x-text="selectedItem?.category"></span>
-                            </span>
-                            <span class="badge badge-outline badge-lg">
-                                Qty: <span x-text="selectedItem?.quantity"></span>
-                            </span>
-                        </div>
-                    </div>
-                    <button type="button" class="btn btn-sm btn-circle btn-ghost"
-                        @click="closeRequestsModal()">
-                        ✕
-                    </button>
-                </div>
-
-                <div class="divider my-6"></div>
-
-                <!-- Loading -->
-                <div x-show="requestsLoading" class="flex flex-col items-center py-8 gap-3">
-                    <span class="loading loading-spinner loading-lg"></span>
-                    <p class="text-sm text-base-content/70">Loading requests…</p>
-                </div>
-
-                <!-- Error -->
-                <div x-show="requestsError" class="alert alert-error mb-4 rounded-xl">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="stroke-current shrink-0 h-6 w-6" fill="none" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                    <span x-text="requestsError"></span>
-                </div>
-
-                <!-- Empty -->
-                <div x-show="!requestsLoading && requests.length === 0 && !requestsError"
-                    class="py-12 text-center">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-16 w-16 mx-auto mb-4 text-base-content/30" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
-                    </svg>
-                    <p class="text-base-content/70 text-lg">No requests yet</p>
-                    <p class="text-base-content/50 text-sm mt-2">When students request this item, they'll appear here.</p>
-                </div>
-
-                <!-- Requests list -->
-                <div class="space-y-5 max-h-96 overflow-y-auto pr-2"
-                    x-show="!requestsLoading && requests.length > 0">
-                    <template x-for="req in requests" :key="req.id">
-                        <div class="card bg-base-200 shadow-sm rounded-xl">
-                            <div class="card-body p-6">
-                                <div class="flex justify-between items-start gap-4 mb-4">
-                                    <div class="flex-1">
-                                        <h4 class="font-bold text-xl mb-3">
-                                            <span x-text="req.affected_name || ('Request #' + req.id)"></span>
-                                        </h4>
-                                        <div class="flex gap-3 text-sm">
-                                            <span class="badge badge-ghost badge-lg">
-                                                Qty: <span x-text="req.requested_quantity"></span>
-                                            </span>
-                                            <span class="badge badge-lg"
-                                                  :class="{
-                                                      'badge-warning': req.status === 'Pending',
-                                                      'badge-success': req.status === 'Approved',
-                                                      'badge-error': req.status === 'Rejected'
-                                                  }"
-                                                  x-text="req.status">
-                                            </span>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <!-- Action buttons -->
-                                <div class="card-actions justify-end pt-4 border-t border-base-300">
-                                    <template x-if="req.status === 'Pending'">
-                                        <div class="flex gap-3">
-                                            <button type="button" class="btn btn-success gap-2 min-w-32"
-                                                @click="updateRequestStatus(req.id, 'Approved')">
-                                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
-                                                </svg>
-                                                Accept
-                                            </button>
-                                            <button type="button" class="btn btn-error gap-2 min-w-32"
-                                                @click="updateRequestStatus(req.id, 'Rejected')">
-                                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-                                                </svg>
-                                                Decline
-                                            </button>
-                                        </div>
-                                    </template>
-                                </div>
-                            </div>
-                        </div>
-                    </template>
-                </div>
-
-                <!-- Footer -->
-                <div class="flex justify-end gap-3 mt-8 pt-6 border-t border-base-300">
-                    <button type="button" class="btn btn-lg min-w-32" @click="closeRequestsModal()">
-                        Close
-                    </button>
-                </div>
+<!-- Donate Item Modal -->
+<div
+    id="donate-modal"
+    class="fixed inset-0 bg-black/60 flex items-center justify-center p-4 z-20 hidden"
+    onclick="if (event.target === this) { closeDonateModal(); }">
+    <div class="card bg-base-100 w-full max-w-sm shadow-2xl rounded-2xl">
+        <div id="donate-form-container"
+             hx-get="/ui/donor/donate-form"
+             hx-trigger="load, refresh-donate-form from:body"
+             hx-target="this"
+             hx-swap="innerHTML">
+            <div class="card-body p-8 text-center text-base-content/70">
+                <span class="loading loading-spinner loading-lg mb-4"></span>
+                <p>Loading form…</p>
             </div>
+        </div>
+    </div>
+</div>
 
-            <!-- Backdrop -->
-            <form method="dialog" class="modal-backdrop bg-black/60">
-                <button type="button" @click="closeRequestsModal()">close</button>
-            </form>
-        </dialog>
+<!-- Requests Modal -->
+<dialog id="requests-modal" class="modal">
+    <div class="modal-box bg-base-100 max-w-2xl w-full p-8">
+        <div id="requests-modal-content" class="py-12 text-center text-base-content/70">
+            <span class="loading loading-spinner loading-lg mb-3"></span>
+            <p>Select an item to view its requests.</p>
+        </div>
+    </div>
+    <form method="dialog" class="modal-backdrop bg-black/60">
+        <button type="button" onclick="closeRequestsModal()">close</button>
+    </form>
+</dialog>
 
-    </div> <!-- /Alpine root -->
+<script>
+    document.addEventListener('DOMContentLoaded', () => {
+        const donateModal = document.getElementById('donate-modal');
+        const donateFormContainer = document.getElementById('donate-form-container');
+        const requestsModal = document.getElementById('requests-modal');
+        const requestsContent = document.getElementById('requests-modal-content');
+        const requestsLoadingTemplate = `
+            <div class="py-12 text-center text-base-content/70">
+                <span class="loading loading-spinner loading-lg mb-3"></span>
+                <p>Loading requests…</p>
+            </div>
+        `;
 
-    </div> <!-- Content wrapper -->
+        window.openDonateModal = function () {
+            if (!donateModal) return;
+            donateModal.classList.remove('hidden');
+            document.body.style.overflow = 'hidden';
+        };
 
-</div> <!-- wrapper -->
+        window.closeDonateModal = function () {
+            if (!donateModal) return;
+            donateModal.classList.add('hidden');
+            document.body.style.overflow = '';
+        };
+
+        window.openRequestsModal = function () {
+            if (!requestsModal) return;
+            if (requestsContent) {
+                requestsContent.innerHTML = requestsLoadingTemplate;
+            }
+            if (!requestsModal.open) {
+                requestsModal.showModal();
+            }
+        };
+
+        window.closeRequestsModal = function () {
+            if (requestsModal && requestsModal.open) {
+                requestsModal.close();
+            }
+        };
+
+        document.body.addEventListener('close-donate-modal', () => {
+            closeDonateModal();
+            document.body.dispatchEvent(new Event('refresh-donate-form'));
+        });
+    });
+</script>
 {% endblock %}

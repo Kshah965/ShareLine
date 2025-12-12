@@ -6,7 +6,7 @@ from routers.auth import OptionalUserRoleDep
 
 
 from db import create_db_and_tables
-from routers import users, items, auth, requests, pages
+from routers import users, items, auth, requests, pages, ui
 
 app = FastAPI(title="ShareLine")
 
@@ -50,3 +50,4 @@ app.include_router(items.router, prefix="/items")
 app.include_router(requests.router, prefix="/requests")
 
 app.include_router(pages.router)
+app.include_router(ui.router)

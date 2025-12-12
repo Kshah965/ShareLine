@@ -1,4 +1,3 @@
-# routers/auth.py
 import secrets
 from typing import Annotated, Optional
 
@@ -15,14 +14,12 @@ from sqlmodel import select
 router = APIRouter(tags=["auth"])
 templates = Jinja2Templates(directory="templates")
 
-
-# in production: use env var, not random each run
 SECRET_KEY = secrets.token_hex(32)
 serializer = URLSafeTimedSerializer(SECRET_KEY)
 
 
 pwd_context = CryptContext(
-    schemes=["pbkdf2_sha256"],  # <- use this instead of bcrypt
+    schemes=["pbkdf2_sha256"],
     deprecated="auto",
 )
 
@@ -55,8 +52,6 @@ def verify_session_token(token: str, max_age_seconds: int = 60 * 60 * 8):
     except Exception:
         return None
 
-
-# ----- Dependency: current user + role from cookie -----
 
 def get_current_user_and_role(
     session: SessionDep,
@@ -113,8 +108,6 @@ OptionalUserRoleDep = Annotated[Optional[dict],
                                 Depends(get_optional_user_and_role)]
 
 
-# ----- Routes -----
-
 @router.get("/login", response_class=HTMLResponse)
 def login_page(
     request: Request,
@@ -164,12 +157,10 @@ async def register(request: Request, session: SessionDep):
     """
     content_type = request.headers.get("content-type", "")
 
-    # ---- 1) Get data from JSON or from form ----
     if content_type.startswith("application/json"):
         data = await request.json()
         user_in = UserCreate(**data)
 
-        # derive role string from booleans
         if user_in.is_donor:
             role = "donor"
         elif user_in.is_affected:
@@ -209,7 +200,6 @@ async def register(request: Request, session: SessionDep):
             is_affected=is_affected,
         )
 
-    # ---- 2) Check if email already exists (for BOTH JSON + form) ----
     existing = session.exec(
         select(User).where(User.email == user_in.email)
     ).first()
@@ -229,7 +219,6 @@ async def register(request: Request, session: SessionDep):
             status_code=400,
         )
 
-    # ---- 3) Hash password and create user ----
     password_hash = hash_password(user_in.password)
 
     user = User(
@@ -280,10 +269,8 @@ async def login(request: Request, session: SessionDep, response: Response):
     """
     content_type = request.headers.get("content-type", "")
 
-    # ---- 1) Get data from JSON or form ----
     if content_type.startswith("application/json"):
         data = await request.json()
-        # here data is already a dict[str, Any] with plain strings
         payload = LoginData(**data)
     else:
         form = await request.form()
@@ -292,7 +279,6 @@ async def login(request: Request, session: SessionDep, response: Response):
         raw_password = form.get("password")
         raw_role = form.get("role")
 
-        # Values might be UploadFile | str | None; we only accept str
         email = raw_email if isinstance(raw_email, str) else None
         password = raw_password if isinstance(raw_password, str) else None
         role = raw_role if isinstance(raw_role, str) else None
@@ -301,12 +287,10 @@ async def login(request: Request, session: SessionDep, response: Response):
             raise HTTPException(
                 status_code=400, detail="All fields are required")
 
-        # Now build the Pydantic model with plain strings
         payload = LoginData(email=email, password=password,
                             role=role)  # type: ignore
 
     try:
-        # ---- 2) Look up user by email ----
         user = session.exec(
             select(User).where(User.email == payload.email)
         ).first()
@@ -316,13 +300,11 @@ async def login(request: Request, session: SessionDep, response: Response):
                 status_code=400, detail="Invalid email or password"
             )
 
-        # ---- 3) Verify password ----
         if not verify_password(payload.password, user.password_hash):
             raise HTTPException(
                 status_code=400, detail="Invalid email or password"
             )
 
-        # ---- 4) Check that the requested role is allowed ----
         if payload.role == "donor" and not user.is_donor:
             raise HTTPException(
                 status_code=400, detail="User is not registered as donor"
@@ -338,22 +320,19 @@ async def login(request: Request, session: SessionDep, response: Response):
                 status_code=500, detail="User has no ID in database"
             )
 
-        # ---- 5) Create session token + cookie ----
         token = create_session_token(user.id, payload.role)
 
-        # If client submitted JSON (API), use the provided response object
         if request.headers.get("content-type", "").startswith("application/json"):
             response.set_cookie(
                 key="session",
                 value=token,
                 httponly=True,
-                secure=False,   # True in production with HTTPS
+                secure=False,
                 samesite="lax",
                 max_age=60 * 60 * 8,
             )
             return {"message": "Login successful", "role": payload.role}
 
-        # For HTML form submissions, set cookie on a redirect response back to /
         resp = RedirectResponse(url="/", status_code=303)
         resp.set_cookie(
             key="session",
@@ -366,11 +345,9 @@ async def login(request: Request, session: SessionDep, response: Response):
         return resp
 
     except HTTPException as exc:
-        # If this was a JSON/API call, re-raise so FastAPI returns JSON error
         if request.headers.get("content-type", "").startswith("application/json"):
             raise
 
-        # Otherwise (form submit), render the login page with an error message
         user = None
         role = None
         return templates.TemplateResponse(
@@ -422,17 +399,14 @@ def require_auth(
 
 UserRoleDep = Annotated[dict, Depends(require_auth)]
 
-# ----- Optional user dependency (for templates/navbar) -----
-
 @router.get("/donor", include_in_schema=False)
 def donor_dashboard(
     request: Request,
-    current: CurrentUserRoleDep,  # <- this gives you {"user": ..., "role": ...}
+    current: CurrentUserRoleDep,
 ):
     user = current["user"]
     role = current["role"]
 
-    # If somehow role isn't donor, send them home
     if role != "donor":
         return RedirectResponse(url="/", status_code=303)
 

@@ -155,31 +155,6 @@ def delete_item(
     session.commit()
     return {"detail": "Item deleted successfully"}
 
-@router.get("/fragments/list", response_class=HTMLResponse)
-def items_list_fragment(request: Request, session: SessionDep):
-    items = session.exec(select(Item)).all()
-    return templates.TemplateResponse(
-        "fragments/items_list.html",
-        {"request": request, "items": items},
-    )
-
-@router.get("/fragments/my-items", response_class=HTMLResponse)
-def my_items_fragment(request: Request, session: SessionDep, current: UserRoleDep):
-    user = current["user"]
-    role = current["role"]
-
-    if role != "donor":
-        raise HTTPException(status_code=403, detail="Only donors can view this page.")
-
-    items = session.exec(
-        select(Item).where(Item.donor_id == user.id)
-    ).all()
-
-    return templates.TemplateResponse(
-        "fragments/items_list.html",
-        {"request": request, "items": items},
-    )
-
 @router.get("/my", response_class=HTMLResponse)
 def my_items_page(request: Request, session: SessionDep, current: UserRoleDep):
     user = current["user"]
